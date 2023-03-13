@@ -1,0 +1,4 @@
+[1] Reading input from file:
+https://stackoverflow.com/questions/57341825/what-does-in-front-of-function-name-mean-in-c
+
+[2] 
