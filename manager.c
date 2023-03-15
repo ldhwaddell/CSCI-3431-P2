@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define NUM_DIRECTIONS 4
+
 char *readSequence(char *fileName)
 {
     FILE *file = fopen(fileName, "r");
@@ -29,9 +31,9 @@ char *readSequence(char *fileName)
     return sequence;
 }
 
-int writeMatrix(char *fileName, int rows, int arr[][4])
+int writeMatrix(int rows, int arr[][NUM_DIRECTIONS])
 {
-    FILE *file = fopen(fileName, "w");
+    FILE *file = fopen("matrix.txt", "w");
     int status;
     if (file == NULL)
     {
@@ -39,7 +41,7 @@ int writeMatrix(char *fileName, int rows, int arr[][4])
     }
     for (int i = 0; i < rows; i++)
     {
-        for (int j = 0; j < 4; j++)
+        for (int j = 0; j < NUM_DIRECTIONS; j++)
         {
             // Set arr[i][j] to 0
             arr[i][j] = 0;
@@ -62,20 +64,46 @@ int writeMatrix(char *fileName, int rows, int arr[][4])
     return 0;
 }
 
-int updateMatrix(char *fileName, int newValue, int row, int rows, int col, int arr[][4])
+int updateMatrix(int x, int y, int newValue, int rows, int arr[][NUM_DIRECTIONS])
 {
-    FILE *file = fopen(fileName, "r+");
+    FILE *file = fopen("matrix.txt", "r+");
+    int status;
     if (file == NULL)
     {
         return 1;
     }
 
-    // Update matrix value
-    arr[row][col] = newValue;
+    // Validation to ensure valid coordinate to update gets entered
+    if (x > rows || x < 0)
+    {
+        return 3;
+    }
+    else if (y > NUM_DIRECTIONS || y < 0)
+    {
+        return 4;
+    }
 
-    // Seek to location to update in matrix.txt
-    fseek(file, (row) * rows * 2 + (col) * 2, SEEK_CUR);
-    fprintf(file, "%d", newValue);
+    // Update matrix value
+    arr[x][y] = newValue;
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < NUM_DIRECTIONS; j++)
+        {
+            // Write new matrix to file, checking for success
+            status = fprintf(file, "%d ", arr[i][j]);
+            if (status < 0)
+            {
+                return 2;
+            }
+        }
+        // Write newline
+        status = fprintf(file, "\n");
+        if (status < 0)
+        {
+            return 2;
+        }
+    }
     fclose(file);
 
     return 0;
@@ -103,12 +131,13 @@ int main()
 
     printf("%s\n", sequence);
 
+    // Declare number of rows
+    int rows = strlen(sequence);
+
     // Declare matrix
-    int matrix[strlen(sequence)][4];
+    int matrix[rows][NUM_DIRECTIONS];
 
-    matrix_write_status = writeMatrix("matrix.txt", strlen(sequence), matrix);
-
-    switch (matrix_write_status)
+    switch (writeMatrix(rows, matrix))
     {
     case 1:
         printf("[Error]: Could not open matrix.txt\n");
@@ -118,8 +147,7 @@ int main()
         exit(1);
     }
 
-
-    int test = updateMatrix("matrix.txt", 9, 3, strlen(sequence), 0, matrix);
+    int test = updateMatrix(1, 3, 9, rows, matrix);
 
     return 0;
 }
