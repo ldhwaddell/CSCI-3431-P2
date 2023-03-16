@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define NUM_DIRECTIONS 4
 
@@ -43,7 +44,7 @@ int writeMatrix(int rows, int arr[][NUM_DIRECTIONS])
     {
         for (int j = 0; j < NUM_DIRECTIONS; j++)
         {
-            // Set arr[i][j] to 0
+            // Set every array value to 0
             arr[i][j] = 0;
             // Write it to file, checking for success
             status = fprintf(file, "%d ", arr[i][j]);
@@ -109,11 +110,41 @@ int updateMatrix(int x, int y, int newValue, int rows, int arr[][NUM_DIRECTIONS]
     return 0;
 }
 
-int main()
+// Function to "randomly" generate a double in range 0-1
+double getRandom()
+{
+    return (rand() % RAND_MAX) / (double)RAND_MAX;
+}
+
+int checkDeadlock()
+{
+
+    return 0;
+}
+
+int main(int argc, char *argv[])
 {
     // Declare variables
     char *sequence;
     int matrix_write_status;
+    double p, r;
+
+    // Initialize a seed for random number generation
+    srand(time(0));
+
+    // Get input for p from command line
+    if (argc != 2)
+    {
+        printf("[Error]: Must enter a probability\n");
+        exit(1);
+    }
+
+    p = atof(argv[1]);
+    if (p < 0.2 || p > 0.7)
+    {
+        printf("[Error]: p must be in range [0.2, 0.7]\n");
+        exit(1);
+    }
 
     printf("Reading input from file sequence.txt\n");
 
@@ -129,7 +160,7 @@ int main()
         exit(1);
     }
 
-    printf("%s\n", sequence);
+    printf("Sequence found: %s\n", sequence);
 
     // Declare number of rows
     int rows = strlen(sequence);
@@ -145,6 +176,22 @@ int main()
     case 2:
         printf("[Error]: Could not write to file matrix.txt\n");
         exit(1);
+    }
+
+    // Start sending buses
+
+    for (int i = 0; i < rows; i++)
+    {
+        r = getRandom();
+
+        if (r < p)
+        {
+            checkDeadlock();
+        }
+        else
+        {
+            // Make child and run the bus
+        }
     }
 
     int test = updateMatrix(1, 3, 9, rows, matrix);
