@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #define NUM_DIRECTIONS 4
 
@@ -128,6 +129,7 @@ int main(int argc, char *argv[])
     char *sequence;
     int matrix_write_status;
     double p, r;
+    int direction;
 
     // Initialize a seed for random number generation
     srand(time(0));
@@ -179,22 +181,71 @@ int main(int argc, char *argv[])
     }
 
     // Start sending buses
+    pid_t pid;
+    char pid_str[20];
+    char direction_str[2];
 
-    for (int i = 0; i < rows; i++)
+    // for (int i = 0; i < rows; i++)
+    int i = 0;
+    while (i < rows)
     {
         r = getRandom();
 
         if (r < p)
         {
             checkDeadlock();
+            printf("checking\n");
         }
         else
         {
+            // Increment i as a bus is now being made
+            i++;
+
             // Make child and run the bus
+            pid = fork();
+            if (pid < 0)
+            {
+                printf("[Error]: Unsuccessful fork to create bus %c at sequence index %d. Program terminating.\n", sequence[i], i);
+                exit(1);
+            }
+            else if (pid == 0)
+            {
+
+                // Convert direction to an integer to bus program can reference direction from array
+                if (sequence[i - 1] == 'N')
+                {
+                    direction = 0;
+                }
+                else if (sequence[i - 1] == 'S')
+                {
+                    direction = 2;
+                }
+                else if (sequence[i - 1] == 'E')
+                {
+                    direction = 3;
+                }
+                else
+                {
+                    direction = 1;
+                }
+
+                //  Create command line args to send to bus program
+                // Convert pid to a char to send as command line argument
+                snprintf(pid_str, sizeof(pid_str), "%d", getpid());
+
+                // convert direction to a char to send as command line argument
+                sprintf(direction_str, "%d", direction);
+
+                char *args[] = {"./bus", pid_str, direction_str, NULL};
+                execvp(args[0], args);
+
+                break;
+            }
         }
+        sleep(1);
     }
 
-    int test = updateMatrix(1, 3, 9, rows, matrix);
+    // int test = updateMatrix(1, 3, 9, rows, matrix);
 
     return 0;
 }
