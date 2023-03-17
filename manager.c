@@ -35,7 +35,7 @@ char *readSequence(char *fileName)
     return sequence;
 }
 
-int writeMatrix(int rows, int arr[][NUM_DIRECTIONS])
+int writeMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
 {
     FILE *file = fopen("matrix.txt", "w");
     int status;
@@ -43,7 +43,7 @@ int writeMatrix(int rows, int arr[][NUM_DIRECTIONS])
     {
         return 1;
     }
-    for (int i = 0; i < rows; i++)
+    for (int i = 0; i < numBuses; i++)
     {
         for (int j = 0; j < NUM_DIRECTIONS; j++)
         {
@@ -68,7 +68,7 @@ int writeMatrix(int rows, int arr[][NUM_DIRECTIONS])
     return 0;
 }
 
-int updateMatrix(int x, int y, int newValue, int rows, int arr[][NUM_DIRECTIONS])
+int updateMatrix(int x, int y, int newValue, int numBuses, int arr[][NUM_DIRECTIONS])
 {
     FILE *file = fopen("matrix.txt", "r+");
     int status;
@@ -78,7 +78,7 @@ int updateMatrix(int x, int y, int newValue, int rows, int arr[][NUM_DIRECTIONS]
     }
 
     // Validation to ensure valid coordinate to update gets entered
-    if (x > rows || x < 0)
+    if (x > numBuses || x < 0)
     {
         return 3;
     }
@@ -90,7 +90,7 @@ int updateMatrix(int x, int y, int newValue, int rows, int arr[][NUM_DIRECTIONS]
     // Update matrix value
     arr[x][y] = newValue;
 
-    for (int i = 0; i < rows; i++)
+    for (int i = 0; i < numBuses; i++)
     {
         for (int j = 0; j < NUM_DIRECTIONS; j++)
         {
@@ -131,10 +131,10 @@ int main(int argc, char *argv[])
     char *sequence;
     int matrix_write_status;
     double p, r;
-    int direction, deadlock = 0;
+    int direction, deadlock = 0, allBusesPassed = 0;
 
     // Initialize a seed for random number generation
-    srand(time(0));
+    srand(getpid());
 
     // Get input for p from command line
     if (argc != 2)
@@ -166,13 +166,13 @@ int main(int argc, char *argv[])
 
     printf("Sequence found: %s\nStarting buses:\n\n", sequence);
 
-    // Declare number of rows
-    int rows = strlen(sequence);
+    // Declare number of buses to create
+    int numBuses = strlen(sequence);
 
     // Declare matrix
-    int matrix[rows][NUM_DIRECTIONS];
+    int matrix[numBuses][NUM_DIRECTIONS];
 
-    switch (writeMatrix(rows, matrix))
+    switch (writeMatrix(numBuses, matrix))
     {
     case 1:
         printf("[Error]: Could not open matrix.txt\n");
@@ -186,74 +186,84 @@ int main(int argc, char *argv[])
     pid_t pid;
     char pid_str[20];
     char direction_str[2];
+    int busID = 0;
 
-    // for (int i = 0; i < rows; i++)
-    int i = 0;
-    while (i < rows)
+    while (deadlock != 1 && allBusesPassed != 1)
     {
-        r = getRandom();
-
-        if (r < p)
+        if (busID < numBuses)
         {
-            checkDeadlock();
-            printf("checking\n");
-            // logic for breaking loop if deadlock detected
+            r = getRandom();
+
+            if (r < p)
+            {
+                deadlock = checkDeadlock();
+                printf("locking\n");
+                // logic for breaking loop if deadlock detected
+                //deadlock = 1;
+            }
+            else
+            {
+                // Increment busID as a new bus is now being made
+                busID++;
+
+                // Make child and run the bus
+                pid = fork();
+                if (pid < 0)
+                {
+                    printf("[Error]: Unsuccessful fork to create bus %c at sequence index %d. Program terminating.\n", sequence[busID], busID);
+                    exit(1);
+                }
+                else if (pid == 0)
+                {
+
+                    // Convert direction to an integer to bus program can reference direction from array
+                    if (sequence[busID - 1] == 'N')
+                    {
+                        direction = 0;
+                    }
+                    else if (sequence[busID - 1] == 'S')
+                    {
+                        direction = 2;
+                    }
+                    else if (sequence[busID - 1] == 'E')
+                    {
+                        direction = 3;
+                    }
+                    else if (sequence[busID - 1] == 'W')
+                    {
+                        direction = 1;
+                    }
+
+                    // Create command line args to send to bus program
+                    // Convert pid, direction to a char to send as command line argument
+                    snprintf(pid_str, sizeof(pid_str), "%d", getpid());
+                    sprintf(direction_str, "%d", direction);
+                    char *args[] = {"./bus", pid_str, direction_str, NULL};
+
+                    execvp(args[0], args);
+                    break;
+                }
+            }
         }
         else
         {
-            // Increment i as a bus is now being made
-            i++;
-
-            // Make child and run the bus
-            pid = fork();
-            if (pid < 0)
-            {
-                printf("[Error]: Unsuccessful fork to create bus %c at sequence index %d. Program terminating.\n", sequence[i], i);
-                exit(1);
-            }
-            else if (pid == 0)
-            {
-
-                // Convert direction to an integer to bus program can reference direction from array
-                if (sequence[i - 1] == 'N')
-                {
-                    direction = 0;
-                }
-                else if (sequence[i - 1] == 'S')
-                {
-                    direction = 2;
-                }
-                else if (sequence[i - 1] == 'E')
-                {
-                    direction = 3;
-                }
-                else if (sequence[i - 1] == 'W')
-                {
-                    direction = 1;
-                }
-
-                // Create command line args to send to bus program
-                // Convert pid, direction to a char to send as command line argument
-                snprintf(pid_str, sizeof(pid_str), "%d", getpid());
-                sprintf(direction_str, "%d", direction);
-                char *args[] = {"./bus", pid_str, direction_str, NULL};
-
-                execvp(args[0], args);
-                break;
-            }
+            // Break loop if deadlock
+            deadlock = checkDeadlock();
+            printf("here\n");
+            allBusesPassed = 1;
         }
+
         sleep(1);
     }
 
-    while (deadlock != 1)
+    if (deadlock)
     {
-        deadlock = checkDeadlock();
-        // Break loop if deadlock
-        // Print out the cycle
-        printf("checking\n");
-        sleep(1);
+        printf("\nSystem Deadlocked!\nThe cycle below was detected:\n\n");
+        printf("pisss");
+    } else if(allBusesPassed){
+        printf("\nSuccess! All buses passed the junction without a deadlock occurring.\n");
+        printf("This working sequence was: %s\n", sequence);
 
-        // Final stop logic being checking all semaphores and them being 0?
     }
 
     // int test = updateMatrix(1, 3, 9, rows, matrix);
