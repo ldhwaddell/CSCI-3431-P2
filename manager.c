@@ -17,11 +17,13 @@ char *readSequence(char *fileName)
     {
         return NULL;
     }
+    // Detemine how much memory needs to be allocated to hold the sequence
     fseek(file, 0, SEEK_END);
     long f_size = ftell(file);
     fseek(file, 0, SEEK_SET);
     sequence = malloc(f_size);
 
+    // Read characters while EOF has not been reached
     while ((c = fgetc(file)) != EOF)
     {
         sequence[n++] = (char)c;
@@ -129,7 +131,7 @@ int main(int argc, char *argv[])
     char *sequence;
     int matrix_write_status;
     double p, r;
-    int direction;
+    int direction, deadlock = 0;
 
     // Initialize a seed for random number generation
     srand(time(0));
@@ -162,7 +164,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    printf("Sequence found: %s\n", sequence);
+    printf("Sequence found: %s\nStarting buses:\n\n", sequence);
 
     // Declare number of rows
     int rows = strlen(sequence);
@@ -195,6 +197,7 @@ int main(int argc, char *argv[])
         {
             checkDeadlock();
             printf("checking\n");
+            // logic for breaking loop if deadlock detected
         }
         else
         {
@@ -224,25 +227,33 @@ int main(int argc, char *argv[])
                 {
                     direction = 3;
                 }
-                else
+                else if (sequence[i - 1] == 'W')
                 {
                     direction = 1;
                 }
 
-                //  Create command line args to send to bus program
-                // Convert pid to a char to send as command line argument
+                // Create command line args to send to bus program
+                // Convert pid, direction to a char to send as command line argument
                 snprintf(pid_str, sizeof(pid_str), "%d", getpid());
-
-                // convert direction to a char to send as command line argument
                 sprintf(direction_str, "%d", direction);
-
                 char *args[] = {"./bus", pid_str, direction_str, NULL};
-                execvp(args[0], args);
 
+                execvp(args[0], args);
                 break;
             }
         }
         sleep(1);
+    }
+
+    while (deadlock != 1)
+    {
+        deadlock = checkDeadlock();
+        // Break loop if deadlock
+        // Print out the cycle
+        printf("checking\n");
+        sleep(1);
+
+        // Final stop logic being checking all semaphores and them being 0?
     }
 
     // int test = updateMatrix(1, 3, 9, rows, matrix);
