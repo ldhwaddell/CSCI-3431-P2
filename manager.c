@@ -30,7 +30,7 @@ char *readSequence(char *fileName)
         sequence[n++] = (char)c;
     }
 
-    // Add termination character to end of char sequences
+    // Add termination character to end of sequence
     sequence[n] = '\0';
 
     return sequence;
@@ -263,7 +263,8 @@ int main(int argc, char *argv[])
 
                     // Create command line args to send to bus program
                     // Convert pid, direction to a char to send as command line argument
-                    snprintf(pid_str, sizeof(pid_str), "%d", getpid());
+                    // snprintf(pid_str, sizeof(pid_str), "%d", getpid());
+                    snprintf(pid_str, sizeof(pid_str), "%d", busID);
                     snprintf(numBuses_str, sizeof(numBuses_str), "%d", numBuses);
                     sprintf(direction_str, "%d", direction);
 
@@ -282,9 +283,29 @@ int main(int argc, char *argv[])
             // Break loop if deadlock
             deadlock = checkDeadlock();
             printf("here\n");
-            sleep(1);
             // allBusesPassed = 1;
+            for (int i = 0; i < numBuses; i++)
+            {
+                wait(NULL);
+            }
+
+            // int test = updateMatrix(1, 3, 9, rows, matrix);
+
+            // Close and unlink all semaphores
+
+            // ADD ERR CHECK
+            sem_close(semEditMatrix);
+            sem_close(semJunction);
+            sem_close(semNorth);
+            sem_close(semWest);
+            sem_close(semSouth);
+            sem_close(semEast);
+            for (int i = 1; i < 7; i++)
+            {
+                sem_unlink(args[i]);
+            }
         }
+        sleep(1);
     }
 
     // If deadlock detected print out the cycle to user
