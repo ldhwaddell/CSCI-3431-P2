@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <semaphore.h>
 
 #define NUM_DIRECTIONS 4
 
@@ -136,7 +137,7 @@ int main(int argc, char *argv[])
     // Initialize a seed for random number generation
     srand(getpid());
 
-    // Get input for p from command line
+    // Get and validate input for p from command line
     if (argc != 2)
     {
         printf("[Error]: Must enter a probability\n");
@@ -150,8 +151,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    // Try to read input from sequence.txt file
     printf("Reading input from file sequence.txt\n");
-
     sequence = readSequence("sequence.txt");
     if (sequence == NULL)
     {
@@ -172,6 +173,7 @@ int main(int argc, char *argv[])
     // Declare matrix
     int matrix[numBuses][NUM_DIRECTIONS];
 
+    // Write all 0's to matrix
     switch (writeMatrix(numBuses, matrix))
     {
     case 1:
@@ -186,7 +188,33 @@ int main(int argc, char *argv[])
     pid_t pid;
     char pid_str[20];
     char direction_str[2];
+    char numBuses_str[100];
     int busID = 0;
+
+    // ---------------------SEMAPHORE CREATION---------------------
+
+    // Semaphore for controlling writing to matrix
+
+    // 0_CREATE: only create semaphore if one doesnt already exist
+    // 0644: read and write permission to user who created, read permission to group
+    // 1: initial semaphore value
+    sem_t *semEditMatrix = sem_open("/semEditMatrix", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *semJunction = sem_open("/semJunction", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *semNorth = sem_open("/semNorth", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *semWest = sem_open("/semWest", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *semSouth = sem_open("/semSouth", O_CREAT | O_EXCL, 0644, 1);
+    sem_t *semEast = sem_open("/semEast", O_CREAT | O_EXCL, 0644, 1);
+
+    char *args[11];
+    args[0] = "./bus";
+    args[1] = "/semEditMatrix";
+    args[2] = "/semJunction";
+    args[3] = "/semNorth";
+    args[4] = "/semWest";
+    args[5] = "/semSouth";
+    args[6] = "/semEast";
+
+    // ------------------------------------------------------------
 
     while (deadlock != 1 && allBusesPassed != 1)
     {
@@ -198,8 +226,7 @@ int main(int argc, char *argv[])
             {
                 deadlock = checkDeadlock();
                 printf("locking\n");
-                // logic for breaking loop if deadlock detected
-                //deadlock = 1;
+                // deadlock = 1;
             }
             else
             {
@@ -216,10 +243,14 @@ int main(int argc, char *argv[])
                 else if (pid == 0)
                 {
 
-                    // Convert direction to an integer to bus program can reference direction from array
+                    // Convert direction to an integer to bus program can reference direction/semaphores from array
                     if (sequence[busID - 1] == 'N')
                     {
                         direction = 0;
+                    }
+                    else if (sequence[busID - 1] == 'W')
+                    {
+                        direction = 1;
                     }
                     else if (sequence[busID - 1] == 'S')
                     {
@@ -229,16 +260,17 @@ int main(int argc, char *argv[])
                     {
                         direction = 3;
                     }
-                    else if (sequence[busID - 1] == 'W')
-                    {
-                        direction = 1;
-                    }
 
                     // Create command line args to send to bus program
                     // Convert pid, direction to a char to send as command line argument
                     snprintf(pid_str, sizeof(pid_str), "%d", getpid());
+                    snprintf(numBuses_str, sizeof(numBuses_str), "%d", numBuses);
                     sprintf(direction_str, "%d", direction);
-                    char *args[] = {"./bus", pid_str, direction_str, NULL};
+
+                    args[7] = pid_str;
+                    args[8] = numBuses_str;
+                    args[9] = direction_str;
+                    args[10] = NULL;
 
                     execvp(args[0], args);
                     break;
@@ -250,23 +282,43 @@ int main(int argc, char *argv[])
             // Break loop if deadlock
             deadlock = checkDeadlock();
             printf("here\n");
-            allBusesPassed = 1;
+            sleep(1);
+            // allBusesPassed = 1;
         }
-
-        sleep(1);
     }
 
+    // If deadlock detected print out the cycle to user
     if (deadlock)
     {
         printf("\nSystem Deadlocked!\nThe cycle below was detected:\n\n");
         printf("pisss");
-    } else if(allBusesPassed){
+    }
+    else if (allBusesPassed)
+    {
         printf("\nSuccess! All buses passed the junction without a deadlock occurring.\n");
         printf("This working sequence was: %s\n", sequence);
+    }
 
+    for (int i = 0; i < numBuses; i++)
+    {
+        wait(NULL);
     }
 
     // int test = updateMatrix(1, 3, 9, rows, matrix);
+
+    // Close and unlink all semaphores
+
+    // ADD ERR CHECK
+    sem_close(semEditMatrix);
+    sem_close(semJunction);
+    sem_close(semNorth);
+    sem_close(semWest);
+    sem_close(semSouth);
+    sem_close(semEast);
+    for (int i = 1; i < 7; i++)
+    {
+        sem_unlink(args[i]);
+    }
 
     return 0;
 }
