@@ -69,51 +69,6 @@ int writeMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
     return 0;
 }
 
-int updateMatrix(int x, int y, int newValue, int numBuses, int arr[][NUM_DIRECTIONS])
-{
-    FILE *file = fopen("matrix.txt", "r+");
-    int status;
-    if (file == NULL)
-    {
-        return 1;
-    }
-
-    // Validation to ensure valid coordinate to update gets entered
-    if (x > numBuses || x < 0)
-    {
-        return 3;
-    }
-    else if (y > NUM_DIRECTIONS || y < 0)
-    {
-        return 4;
-    }
-
-    // Update matrix value
-    arr[x][y] = newValue;
-
-    for (int i = 0; i < numBuses; i++)
-    {
-        for (int j = 0; j < NUM_DIRECTIONS; j++)
-        {
-            // Write new matrix to file, checking for success
-            status = fprintf(file, "%d ", arr[i][j]);
-            if (status < 0)
-            {
-                return 2;
-            }
-        }
-        // Write newline
-        status = fprintf(file, "\n");
-        if (status < 0)
-        {
-            return 2;
-        }
-    }
-    fclose(file);
-
-    return 0;
-}
-
 // Function to "randomly" generate a double in range 0-1
 double getRandom()
 {
@@ -124,6 +79,15 @@ int checkDeadlock()
 {
 
     return 0;
+}
+
+void closeSemaphore(sem_t *sem, char *name)
+{
+    if (sem_close(sem) == -1)
+    {
+        printf("[Error]: Manager could not close the %s semaphore\n", name);
+        exit(EXIT_FAILURE);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -141,14 +105,14 @@ int main(int argc, char *argv[])
     if (argc != 2)
     {
         printf("[Error]: Must enter a probability\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     p = atof(argv[1]);
     if (p < 0.2 || p > 0.7)
     {
         printf("[Error]: p must be in range [0.2, 0.7]\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // Try to read input from sequence.txt file
@@ -157,12 +121,12 @@ int main(int argc, char *argv[])
     if (sequence == NULL)
     {
         printf("[Error]: Could not open file.\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     else if (*sequence == '\0')
     {
         printf("[Error]: Sequence.txt apprears to be empty.\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     printf("Sequence found: %s\nStarting buses:\n\n", sequence);
@@ -178,10 +142,10 @@ int main(int argc, char *argv[])
     {
     case 1:
         printf("[Error]: Could not open matrix.txt\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     case 2:
         printf("[Error]: Could not write to file matrix.txt\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // Start sending buses
@@ -225,7 +189,6 @@ int main(int argc, char *argv[])
             if (r < p)
             {
                 deadlock = checkDeadlock();
-                printf("locking\n");
                 // deadlock = 1;
             }
             else
@@ -238,12 +201,12 @@ int main(int argc, char *argv[])
                 if (pid < 0)
                 {
                     printf("[Error]: Unsuccessful fork to create bus %c at sequence index %d. Program terminating.\n", sequence[busID], busID);
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
                 else if (pid == 0)
                 {
 
-                    // Convert direction to an integer to bus program can reference direction/semaphores from array
+                    // Convert direction to an integer so bus program can reference direction/semaphores from array
                     if (sequence[busID - 1] == 'N')
                     {
                         direction = 0;
@@ -261,9 +224,7 @@ int main(int argc, char *argv[])
                         direction = 3;
                     }
 
-                    // Create command line args to send to bus program
                     // Convert pid, direction to a char to send as command line argument
-                    // snprintf(pid_str, sizeof(pid_str), "%d", getpid());
                     snprintf(pid_str, sizeof(pid_str), "%d", busID);
                     snprintf(numBuses_str, sizeof(numBuses_str), "%d", numBuses);
                     sprintf(direction_str, "%d", direction);
@@ -283,36 +244,21 @@ int main(int argc, char *argv[])
             // Break loop if deadlock
             deadlock = checkDeadlock();
             printf("here\n");
-            // allBusesPassed = 1;
-            for (int i = 0; i < numBuses; i++)
-            {
-                wait(NULL);
-            }
-
-            // int test = updateMatrix(1, 3, 9, rows, matrix);
-
-            // Close and unlink all semaphores
-
-            // ADD ERR CHECK
-            sem_close(semEditMatrix);
-            sem_close(semJunction);
-            sem_close(semNorth);
-            sem_close(semWest);
-            sem_close(semSouth);
-            sem_close(semEast);
-            for (int i = 1; i < 7; i++)
-            {
-                sem_unlink(args[i]);
-            }
+            allBusesPassed = 1;
         }
         sleep(1);
+    }
+
+    // Ensure all children are finished
+    for (int i = 0; i < numBuses; i++)
+    {
+        wait(NULL);
     }
 
     // If deadlock detected print out the cycle to user
     if (deadlock)
     {
         printf("\nSystem Deadlocked!\nThe cycle below was detected:\n\n");
-        printf("pisss");
     }
     else if (allBusesPassed)
     {
@@ -320,22 +266,13 @@ int main(int argc, char *argv[])
         printf("This working sequence was: %s\n", sequence);
     }
 
-    for (int i = 0; i < numBuses; i++)
-    {
-        wait(NULL);
-    }
-
-    // int test = updateMatrix(1, 3, 9, rows, matrix);
-
     // Close and unlink all semaphores
-
-    // ADD ERR CHECK
-    sem_close(semEditMatrix);
-    sem_close(semJunction);
-    sem_close(semNorth);
-    sem_close(semWest);
-    sem_close(semSouth);
-    sem_close(semEast);
+    closeSemaphore(semEditMatrix, "editMatrix");
+    closeSemaphore(semJunction, "junction");
+    closeSemaphore(semNorth, "north");
+    closeSemaphore(semWest, "west");
+    closeSemaphore(semSouth, "south");
+    closeSemaphore(semEast, "east");
     for (int i = 1; i < 7; i++)
     {
         sem_unlink(args[i]);

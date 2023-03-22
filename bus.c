@@ -1,10 +1,21 @@
+/*ADD FILE DESCRIPTION HERE*/
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <semaphore.h>
+#include <string.h>
 
 #define NUM_DIRECTIONS 4
 
+/*
+ * Function: readMatrix
+ * --------------------
+ * Read a numBuses X num_directions matrix into arr
+ *
+ *  numBuses: The number of buses(rows) in the matrix
+ *  arr: The array to save the values in to
+ */
 void readMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
 {
     FILE *file = fopen("matrix.txt", "r");
@@ -36,6 +47,18 @@ void updateMatrix(int row, int col, int newVal, int numBuses, int arr[][NUM_DIRE
         exit(EXIT_FAILURE);
     }
 
+    // Validation to ensure valid coordinate to update gets received
+    if (row > numBuses || row < 0)
+    {
+        printf("[Error]: %d is not a valid row to edit\n", row);
+        exit(EXIT_FAILURE);
+    }
+    else if (col > NUM_DIRECTIONS || col < 0)
+    {
+        printf("[Error]: %d is not a valid column to edit\n", col);
+        exit(EXIT_FAILURE);
+    }
+
     // Update desired value
     arr[row][col] = newVal;
 
@@ -62,8 +85,6 @@ void updateMatrix(int row, int col, int newVal, int numBuses, int arr[][NUM_DIRE
     }
 
     fclose(file);
-    // printf("Setting (%d, %d) to %d\n", row, col, newVal);
-    // sleep(1);
 }
 
 void waitSemaphore(sem_t *sem, int pid, char *direction)
@@ -73,6 +94,14 @@ void waitSemaphore(sem_t *sem, int pid, char *direction)
         if (direction == NULL || *direction == '\0')
         {
             printf("[Error]: Bus <%d> could not request Junction semaphore\n", pid);
+        }
+        else if (strcmp(direction, "edit"))
+        {
+            printf("[Error]: Bus <%d> could not request the editMatrix semaphore\n", pid);
+        }
+        else if (strcmp(direction, "junction"))
+        {
+            printf("[Error]: Bus <%d> could not request the Junction semaphore\n", pid);
         }
         else
         {
@@ -90,6 +119,14 @@ void postSemaphore(sem_t *sem, int pid, char *direction)
         {
             printf("[Error]: Bus <%d> could not post Junction semaphore\n", pid);
         }
+        else if (strcmp(direction, "edit"))
+        {
+            printf("[Error]: Bus <%d> could not post the editMatrix semaphore\n", pid);
+        }
+        else if (strcmp(direction, "junction"))
+        {
+            printf("[Error]: Bus <%d> could not post the Junction semaphore\n", pid);
+        }
         else
         {
             printf("[Error]: Bus <%d> could not post %s semaphore\n", pid, direction);
@@ -100,11 +137,19 @@ void postSemaphore(sem_t *sem, int pid, char *direction)
 
 void closeSemaphore(sem_t *sem, int pid, char *direction)
 {
-    if (sem_post(sem) == -1)
+    if (sem_close(sem) == -1)
     {
         if (direction == NULL || *direction == '\0')
         {
             printf("[Error]: Bus <%d> could not close Junction semaphore\n", pid);
+        }
+        else if (strcmp(direction, "edit"))
+        {
+            printf("[Error]: Bus <%d> could not close the editMatrix semaphore\n", pid);
+        }
+        else if (strcmp(direction, "junction"))
+        {
+            printf("[Error]: Bus <%d> could not close the Junction semaphore\n", pid);
         }
         else
         {
@@ -139,7 +184,7 @@ int main(int argc, char *argv[])
     // Create matrix to hold current semaphore values
     int matrix[numBuses][NUM_DIRECTIONS];
 
-    // Initialize the named semaphores
+    // Initialize named semaphores
     semEditMatrix = sem_open(argv[1], 0);
     semJunction = sem_open(argv[2], 0);
 
@@ -172,68 +217,70 @@ int main(int argc, char *argv[])
     // Request semaphore for current direction
     printf("Bus <%d>: Requests for %s lock\n", pid, directions[curr_direction]);
 
-    // Update matrix to reflect request
-    // waitSemaphore(semEditMatrix, pid, NULL);
-    // updateMatrix((pid - 1), curr_direction, 1, numBuses, matrix);
-    // postSemaphore(semEditMatrix, pid, NULL);
+    // Update matrix to reflect request for current direction semaphore
+    waitSemaphore(semEditMatrix, pid, "edit");
+    updateMatrix((pid - 1), curr_direction, 1, numBuses, matrix);
+    postSemaphore(semEditMatrix, pid, "edit");
 
     waitSemaphore(sem_directions[curr_direction], pid, directions[curr_direction]);
     printf("Bus <%d>: Acquires %s lock\n", pid, directions[curr_direction]);
 
-    // Update matrix to reflect acquisition
-    // waitSemaphore(semEditMatrix, pid, NULL);
-    // updateMatrix((pid - 1), curr_direction, 2, numBuses, matrix);
-    // postSemaphore(semEditMatrix, pid, NULL);
+    // Update matrix to reflect acquisition of current direction semaphore
+    waitSemaphore(semEditMatrix, pid, "edit");
+    updateMatrix((pid - 1), curr_direction, 2, numBuses, matrix);
+    postSemaphore(semEditMatrix, pid, "edit");
 
     // Request semaphore for right direction
     printf("Bus <%d>: Requests for %s lock\n", pid, directions[right]);
 
-    // Update matrix to reflect request
-    // waitSemaphore(semEditMatrix, pid, NULL);
-    // updateMatrix((pid - 1), right, 1, numBuses, matrix);
-    // postSemaphore(semEditMatrix, pid, NULL);
+    // Update matrix to reflect request for right direction semaphore
+    waitSemaphore(semEditMatrix, pid, "edit");
+    updateMatrix((pid - 1), right, 1, numBuses, matrix);
+    postSemaphore(semEditMatrix, pid, "edit");
 
     waitSemaphore(sem_directions[right], pid, directions[right]);
     printf("Bus <%d>: Acquires %s lock\n", pid, directions[right]);
 
-    // Update matrix to reflect acquisition
-    // waitSemaphore(semEditMatrix, pid, NULL);
-    // updateMatrix((pid - 1), right, 2, numBuses, matrix);
-    // postSemaphore(semEditMatrix, pid, NULL);
+    // Update matrix to reflect acquisition of right direction semaphore
+    waitSemaphore(semEditMatrix, pid, "edit");
+    updateMatrix((pid - 1), right, 2, numBuses, matrix);
+    postSemaphore(semEditMatrix, pid, "edit");
 
     // Request semaphore for junction
     printf("Bus <%d>: Requests Junction lock\n", pid);
-    waitSemaphore(semJunction, pid, NULL);
+    waitSemaphore(semJunction, pid, "junction");
+
+    // Pass junction
     printf("Bus <%d>: Acquires Junction lock; Passing Junction;\n", pid);
     sleep(2);
 
     // Release Junction lock
+    postSemaphore(semJunction, pid, "junction");
     printf("Bus <%d>: Releases Junction lock\n", pid);
-    postSemaphore(semJunction, pid, NULL);
 
     // Release current direction lock
-    printf("Bus <%d>: Releases %s lock\n", pid, directions[curr_direction]);
     postSemaphore(sem_directions[curr_direction], pid, directions[curr_direction]);
+    printf("Bus <%d>: Releases %s lock\n", pid, directions[curr_direction]);
 
     // Update matrix to reflect release of current direction
-    // waitSemaphore(semEditMatrix, pid, NULL);
-    // updateMatrix((pid - 1), curr_direction, 0, numBuses, matrix);
-    // postSemaphore(semEditMatrix, pid, NULL);
+    waitSemaphore(semEditMatrix, pid, "edit");
+    updateMatrix((pid - 1), curr_direction, 0, numBuses, matrix);
+    postSemaphore(semEditMatrix, pid, "edit");
 
     // Release right direction lock
-    printf("Bus <%d>: Releases %s lock\n", pid, directions[right]);
     postSemaphore(sem_directions[right], pid, directions[right]);
+    printf("Bus <%d>: Releases %s lock\n", pid, directions[right]);
 
     // Update matrix to reflect release of right direction
-    // waitSemaphore(semEditMatrix, pid, NULL);
-    // updateMatrix((pid - 1), right, 0, numBuses, matrix);
-    // postSemaphore(semEditMatrix, pid, NULL);
+    waitSemaphore(semEditMatrix, pid, "edit");
+    updateMatrix((pid - 1), right, 0, numBuses, matrix);
+    postSemaphore(semEditMatrix, pid, "edit");
 
     // Close the semaphores
     closeSemaphore(sem_directions[curr_direction], pid, directions[curr_direction]);
     closeSemaphore(sem_directions[right], pid, directions[right]);
-    closeSemaphore(semJunction, pid, NULL);
-    closeSemaphore(semEditMatrix, pid, NULL);
+    closeSemaphore(semJunction, pid, "junction");
+    closeSemaphore(semEditMatrix, pid, "edit");
 
     return 0;
 }
