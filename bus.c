@@ -72,6 +72,7 @@ void updateMatrix(int row, int col, int newVal, int numBuses, int arr[][NUM_DIRE
             if (status < 0)
             {
                 printf("[Error]: Could not write to matrix.txt\n");
+                printf("[]");
                 exit(EXIT_FAILURE);
             }
         }
@@ -190,13 +191,13 @@ int main(int argc, char *argv[])
 
     if (semEditMatrix == SEM_FAILED)
     {
-        printf("[Error]: Could not create create 'semEditMatrix'\n");
+        printf("[Error]: Bus <%d> could not create 'semEditMatrix'\n", pid);
         exit(EXIT_FAILURE);
     }
 
     if (semJunction == SEM_FAILED)
     {
-        printf("[Error]: Could not create create 'semJunction'\n");
+        printf("[Error]: Bus <%d> could not create 'semJunction'\n", pid);
         exit(EXIT_FAILURE);
     }
 
@@ -206,7 +207,8 @@ int main(int argc, char *argv[])
         sem_directions[i - 3] = sem_open(argv[i], 0);
         if (sem_directions[i - 3] == SEM_FAILED)
         {
-            printf("[Error]: Could not create semaphore: %s\n", argv[i]);
+            printf("[Error]: Bus <%d> could not create semaphore '%s'\n", pid, argv[i]);
+
             exit(EXIT_FAILURE);
         }
     }

@@ -7,9 +7,9 @@
 
 #define NUM_DIRECTIONS 4
 
-char *readSequence(char *fileName)
+char *readSequence()
 {
-    FILE *file = fopen(fileName, "r");
+    FILE *file = fopen("sequence.txt", "r");
     char *sequence;
     size_t n = 0;
     int c;
@@ -36,13 +36,14 @@ char *readSequence(char *fileName)
     return sequence;
 }
 
-int writeMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
+void writeMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
 {
     FILE *file = fopen("matrix.txt", "w");
     int status;
     if (file == NULL)
     {
-        return 1;
+        printf("[Error]: Could not open matrix.txt\n");
+        exit(EXIT_FAILURE);
     }
     for (int i = 0; i < numBuses; i++)
     {
@@ -54,19 +55,20 @@ int writeMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
             status = fprintf(file, "%d ", arr[i][j]);
             if (status < 0)
             {
-                return 2;
+                printf("[Error]: Could not write to file matrix.txt\n");
+                exit(EXIT_FAILURE);
             }
         }
         // Write newline
         status = fprintf(file, "\n");
         if (status < 0)
         {
-            return 2;
+            printf("[Error]: Could not write to file matrix.txt\n");
+            exit(EXIT_FAILURE);
         }
     }
     fclose(file);
 
-    return 0;
 }
 
 // Function to "randomly" generate a double in range 0-1
@@ -117,7 +119,7 @@ int main(int argc, char *argv[])
 
     // Try to read input from sequence.txt file
     printf("Reading input from file sequence.txt\n");
-    sequence = readSequence("sequence.txt");
+    sequence = readSequence();
     if (sequence == NULL)
     {
         printf("[Error]: Could not open file.\n");
@@ -138,15 +140,7 @@ int main(int argc, char *argv[])
     int matrix[numBuses][NUM_DIRECTIONS];
 
     // Write all 0's to matrix
-    switch (writeMatrix(numBuses, matrix))
-    {
-    case 1:
-        printf("[Error]: Could not open matrix.txt\n");
-        exit(EXIT_FAILURE);
-    case 2:
-        printf("[Error]: Could not write to file matrix.txt\n");
-        exit(EXIT_FAILURE);
-    }
+    writeMatrix(numBuses, matrix);
 
     // Start sending buses
     pid_t pid;
@@ -244,7 +238,7 @@ int main(int argc, char *argv[])
             // Break loop if deadlock
             deadlock = checkDeadlock();
             printf("here\n");
-            allBusesPassed = 1;
+            // allBusesPassed = 1;
         }
         sleep(1);
     }
