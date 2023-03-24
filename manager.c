@@ -124,16 +124,16 @@ void readMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
     fclose(file);
 }
 
-void createGraph(int numBuses, int matrix[][NUM_DIRECTIONS], int adj_matrix[][numBuses + 4])
+void createGraph(int numBuses, int nodes, int matrix[][NUM_DIRECTIONS], int adj_matrix[][nodes])
 {
 
     // Read current values from matrix.txt into curr_matrix
     readMatrix(numBuses, matrix);
 
     // Iterate over each row and column in adj_matrix and fill with 0's
-    for (int i = 0; i < numBuses + 4; i++)
+    for (int i = 0; i < nodes; i++)
     {
-        for (int j = 0; j < numBuses+4; j++)
+        for (int j = 0; j < nodes; j++)
         {
             adj_matrix[i][j] = 0;
         }
@@ -147,33 +147,32 @@ void createGraph(int numBuses, int matrix[][NUM_DIRECTIONS], int adj_matrix[][nu
             if (matrix[i][j] == 2)
             {
                 // Add an edge in
-                printf("Value at (%d, %d) is 2, adding to adj: (%d, %d)\n", i, j, j, (i + 4) % numBuses+4);
+                printf("Value at (%d, %d) is 2, adding to adj: (%d, %d)\n", i, j, j, (i + 4));
                 adj_matrix[j][(i + 4)] = 1;
             }
             else if (matrix[i][j] == 1)
             {
-                printf("Value at (%d, %d) is 1, adding to adj: (%d, %d)\n", i, j, (i + 4) % numBuses+4, j);
+                printf("Value at (%d, %d) is 1, adding to adj: (%d, %d)\n", i, j, (i + 4), j);
                 adj_matrix[(i + 4)][j] = 1;
             }
         }
     }
 
-    for (int i = 0; i < numBuses + 4; i++)
-    {
-        for (int j = 0; j < numBuses+4; j++)
-        {
-            printf("%d ", adj_matrix[i][j]);
-        }
-        printf("\n");
-    }
+    // for (int i = 0; i < numBuses + 4; i++)
+    // {
+    //     for (int j = 0; j < numBuses+4; j++)
+    //     {
+    //         printf("%d ", adj_matrix[i][j]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
-int checkDeadlock(int numBuses, int adj_matrix[][numBuses + 4])
+int checkDeadlock(int nodes, int adj_matrix[][nodes])
 {
-    int vertices = numBuses + 4;
-    int states[vertices];
+    int states[nodes];
 
-    for (int v = 0; v < vertices; v++)
+    for (int v = 0; v < nodes; v++)
     {
         states[v] = INITIAL;
     }
@@ -246,13 +245,14 @@ int main(int argc, char *argv[])
     // Declare matrix
     int matrix[numBuses][NUM_DIRECTIONS];
 
+    // Declare number of nodes in graph
+    int nodes = numBuses + 4;
+
     // Declare adjacency matrix
-    int adj_matrix[numBuses + 4][numBuses + 4];
+    int adj_matrix[nodes][nodes];
 
     // Write all 0's to matrix
     writeMatrix(numBuses, matrix);
-
-    // createGraph(numBuses, matrix, adj_matrix);
 
     // Start sending buses
     pid_t pid;
@@ -262,8 +262,6 @@ int main(int argc, char *argv[])
     int busID = 0;
 
     // ---------------------SEMAPHORE CREATION---------------------
-
-    // Semaphore for controlling writing to matrix
 
     // 0_CREATE: only create semaphore if one doesnt already exist
     // 0644: read and write permission to user who created, read permission to group
@@ -296,8 +294,8 @@ int main(int argc, char *argv[])
             {
                 waitSemaphore(semEditMatrix);
                 printf("Manager waiting for semEditMatrix\n");
-                createGraph(numBuses, matrix, adj_matrix);
-                deadlock = checkDeadlock(numBuses, adj_matrix);
+                createGraph(numBuses, nodes, matrix, adj_matrix);
+                deadlock = checkDeadlock(nodes, adj_matrix);
                 printf("Manager releasing semEditMatrix\n");
                 postSemaphore(semEditMatrix);
                 // deadlock = 1;
@@ -355,11 +353,12 @@ int main(int argc, char *argv[])
             // Break loop if deadlock
             waitSemaphore(semEditMatrix);
             printf("Manager waiting for semEditMatrix\n");
-            createGraph(numBuses, matrix, adj_matrix);
-            deadlock = checkDeadlock(numBuses, adj_matrix);
+            createGraph(numBuses, nodes, matrix, adj_matrix);
+            deadlock = checkDeadlock(nodes, adj_matrix);
             printf("Manager releasing semEditMatrix\n");
             postSemaphore(semEditMatrix);
             printf("here\n");
+            
             // allBusesPassed = 1;
             deadlock = 1;
             // sleep(1);
