@@ -8,6 +8,20 @@
 
 #define NUM_DIRECTIONS 4
 
+sem_t *sem_directions[4];
+sem_t *semEditMatrix, *semJunction;
+
+void sigtermHandler()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        sem_close(sem_directions[i]);
+    }
+    sem_close(semEditMatrix);
+    sem_close(semJunction);
+    exit(EXIT_SUCCESS);
+}
+
 /*
  * Function: readMatrix
  * --------------------
@@ -162,13 +176,14 @@ void closeSemaphore(sem_t *sem, int pid, char *direction)
 
 int main(int argc, char *argv[])
 {
+    // Create signal handler to always close semaphores if
+    // the bus process gets killed in event of deadlock
+    signal(SIGTERM, sigtermHandler);
 
     // Declare variables
     pid_t pid;
     int curr_direction, numBuses;
     char *directions[] = {"North", "West", "South", "East"};
-    sem_t *sem_directions[4];
-    sem_t *semEditMatrix, *semJunction;
 
     // Get bus id
     pid = atoi(argv[7]);

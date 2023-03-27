@@ -4,6 +4,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <signal.h>
+#include <errno.h>
 
 #define NUM_DIRECTIONS 4
 #define INITIAL 1
@@ -106,7 +108,7 @@ double getRandom()
  *  numBuses: The number of buses(rows) in the matrix
  *  arr: The array to save the values in to
  */
-void readMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
+void readMatrix(int numBuses, int arr[numBuses][NUM_DIRECTIONS])
 {
     FILE *file = fopen("matrix.txt", "r");
     int status;
@@ -124,7 +126,7 @@ void readMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
     fclose(file);
 }
 
-void createGraph(int numBuses, int nodes, int matrix[][NUM_DIRECTIONS], int adj_matrix[][nodes])
+void createGraph(int numBuses, int nodes, int matrix[numBuses][NUM_DIRECTIONS], int adj_matrix[nodes][nodes])
 {
 
     // Read current values from matrix.txt into curr_matrix
@@ -147,45 +149,85 @@ void createGraph(int numBuses, int nodes, int matrix[][NUM_DIRECTIONS], int adj_
             if (matrix[i][j] == 2)
             {
                 // Add an edge in
-                printf("Value at (%d, %d) is 2, adding to adj: (%d, %d)\n", i, j, j, (i + 4));
                 adj_matrix[j][(i + 4)] = 1;
             }
             else if (matrix[i][j] == 1)
             {
-                printf("Value at (%d, %d) is 1, adding to adj: (%d, %d)\n", i, j, (i + 4), j);
                 adj_matrix[(i + 4)][j] = 1;
             }
         }
     }
-
-    // for (int i = 0; i < numBuses + 4; i++)
-    // {
-    //     for (int j = 0; j < numBuses+4; j++)
-    //     {
-    //         printf("%d ", adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
-int checkDeadlock(int nodes, int adj_matrix[][nodes])
+int DFS(int checkNode, int nodes, int states[nodes], int adj_matrix[nodes][nodes], int cycle[nodes][2], int deadlocked)
 {
-    int states[nodes];
+    // Set state of current node to visited
+    states[checkNode] = VISITED;
 
-    for (int v = 0; v < nodes; v++)
+    for (int i = 0; i < nodes; i++)
     {
-        states[v] = INITIAL;
+        if (adj_matrix[checkNode][i] == 1)
+        {
+            if (checkNode > i)
+            {
+                cycle[i][0] = checkNode;
+                cycle[i][1] = i;
+            }
+            if (states[i] == INITIAL)
+            {
+                deadlocked = DFS(i, nodes, states, adj_matrix, cycle, deadlocked);
+            }
+            else if (states[i] == VISITED)
+            {
+                deadlocked = 1;
+                return deadlocked;
+            }
+        }
     }
 
-    // start the DFS at vertex 0
+    states[checkNode] = FINISHED;
+    return deadlocked;
+}
 
-    // Need a way of keeping track of everything that has been seen
+int checkDeadlock(int nodes, int adj_matrix[nodes][nodes], int cycle[nodes][2])
+{
+    int deadlocked = 0;
+    // Set all values in cycle back to 0
+    for (int i = 0; i < nodes; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
+            cycle[i][j] = 0;
+        }
+    }
 
-    // Everytime it sees a node, add it to list of ones that have been seen.
+    // Create an array to keep track of the states of all the nodes
+    int states[nodes];
 
-    // If cycledetected, then print out that list in order?
+    // Set the states of all nodes to initial
+    for (int n = 0; n < nodes; n++)
+    {
+        states[n] = INITIAL;
+    }
 
-    return 0;
+    // Start traversing list of nodes
+    for (int n = 0; n < nodes; n++)
+    {
+        // Call DFS on node if state is still initial
+        if (states[n] == INITIAL)
+        {
+            deadlocked = DFS(n, nodes, states, adj_matrix, cycle, deadlocked);
+            if (deadlocked)
+            {
+                printf("in return: %d\n", deadlocked);
+                return deadlocked;
+            }
+        }
+    }
+    // If DFS function does not return, then there is no cycle. Let user know
+    printf("outside return: %d\n", deadlocked);
+
+    return deadlocked;
 }
 
 void closeSemaphore(sem_t *sem, char *name)
@@ -204,7 +246,7 @@ int main(int argc, char *argv[])
     char *sequence;
     int matrix_write_status;
     double p, r;
-    int direction, deadlock = 0, allBusesPassed = 0;
+    int direction, deadlock = 0;
 
     // Initialize a seed for random number generation
     srand(getpid());
@@ -217,7 +259,7 @@ int main(int argc, char *argv[])
     }
 
     p = atof(argv[1]);
-    if (p < 0.2 || p > 0.7)
+    if (p < 0.1 || p > 0.7)
     {
         printf("[Error]: p must be in range [0.2, 0.7]\n");
         exit(EXIT_FAILURE);
@@ -242,6 +284,9 @@ int main(int argc, char *argv[])
     // Declare number of buses to create
     int numBuses = strlen(sequence);
 
+    // Declare variable to contain the number of buses that have not completed
+    int remainingBuses = numBuses;
+
     // Declare matrix
     int matrix[numBuses][NUM_DIRECTIONS];
 
@@ -251,15 +296,29 @@ int main(int argc, char *argv[])
     // Declare adjacency matrix
     int adj_matrix[nodes][nodes];
 
+    // Declare 2D array to hold information about possible cycles
+    int cycle[nodes][2];
+
     // Write all 0's to matrix
     writeMatrix(numBuses, matrix);
 
+    // createGraph(numBuses, nodes, matrix, adj_matrix);
+
+    // int test = checkDeadlock(nodes, adj_matrix, cycle);
+    // printf("test val: %d\n", test);
+
     // Start sending buses
-    pid_t pid;
+    pid_t pids[numBuses], waitingPid;
     char pid_str[20];
     char direction_str[2];
     char numBuses_str[100];
     int busID = 0;
+
+    // Fill pids array with 0's
+    for (int i = 0; i < numBuses; i++)
+    {
+        pids[i] = 0;
+    }
 
     // ---------------------SEMAPHORE CREATION---------------------
 
@@ -284,8 +343,9 @@ int main(int argc, char *argv[])
 
     // ------------------------------------------------------------
 
-    while (deadlock != 1 && allBusesPassed != 1)
+    while (deadlock != 1 && remainingBuses > 0)
     {
+
         if (busID < numBuses)
         {
             r = getRandom();
@@ -293,20 +353,17 @@ int main(int argc, char *argv[])
             if (r < p)
             {
                 waitSemaphore(semEditMatrix);
-                printf("Manager waiting for semEditMatrix\n");
                 createGraph(numBuses, nodes, matrix, adj_matrix);
-                deadlock = checkDeadlock(nodes, adj_matrix);
-                printf("Manager releasing semEditMatrix\n");
+                deadlock = checkDeadlock(nodes, adj_matrix, cycle);
                 postSemaphore(semEditMatrix);
-                // deadlock = 1;
             }
             else
             {
-                // Increment busID as a new bus is now being made
+                // Increment busID for new bus
                 busID++;
 
                 // Make child and run the bus
-                pid = fork();
+                pid_t pid = fork();
                 if (pid < 0)
                 {
                     printf("[Error]: Unsuccessful fork to create bus %c at sequence index %d. Program terminating.\n", sequence[busID], busID);
@@ -314,7 +371,6 @@ int main(int argc, char *argv[])
                 }
                 else if (pid == 0)
                 {
-
                     // Convert direction to an integer so bus program can reference direction/semaphores from array
                     if (sequence[busID - 1] == 'N')
                     {
@@ -346,38 +402,49 @@ int main(int argc, char *argv[])
                     execvp(args[0], args);
                     break;
                 }
+                else
+                {
+                    // Save child PID so it can be terminated
+                    pids[busID - 1] = pid;
+                }
             }
         }
         else
         {
+            // Whenever a child process finishes, decrement the # of remaining buses
+            if (waitpid(-1, NULL, WNOHANG) != 0)
+            {
+                remainingBuses--;
+            }
+
             // Break loop if deadlock
             waitSemaphore(semEditMatrix);
-            printf("Manager waiting for semEditMatrix\n");
             createGraph(numBuses, nodes, matrix, adj_matrix);
-            deadlock = checkDeadlock(nodes, adj_matrix);
-            printf("Manager releasing semEditMatrix\n");
+            deadlock = checkDeadlock(nodes, adj_matrix, cycle);
             postSemaphore(semEditMatrix);
-            printf("here\n");
-            
-            // allBusesPassed = 1;
-            deadlock = 1;
-            // sleep(1);
         }
         sleep(1);
-    }
-
-    // Ensure all children are finished
-    for (int i = 0; i < numBuses; i++)
-    {
-        wait(NULL);
     }
 
     // If deadlock detected print out the cycle to user
     if (deadlock)
     {
+        // Send SIGTERM to all children so they always close semaphores
+        for (int i = 0; i < numBuses - 1; i++)
+        {
+            if (pids[i] != 0)
+            {
+                if (kill(pids[i], SIGTERM) == -1 && errno == ESRCH)
+                {
+                    printf("[Warning]: Process %d has already exited, skipping...\n", pids[i]);
+                    continue;
+                }
+            }
+        }
         printf("\nSystem Deadlocked!\nThe cycle below was detected:\n\n");
     }
-    else if (allBusesPassed)
+    // Otherwise let user know of success
+    else if (remainingBuses == 0)
     {
         printf("\nSuccess! All buses passed the junction without a deadlock occurring.\n");
         printf("This working sequence was: %s\n", sequence);
@@ -394,6 +461,7 @@ int main(int argc, char *argv[])
     {
         sem_unlink(args[i]);
     }
+    printf("\nAll semaphores successfully closed.\n");
 
     return 0;
 }
