@@ -10,7 +10,6 @@
 #define NUM_DIRECTIONS 4
 #define INITIAL 1
 #define VISITED 2
-#define FINISHED 3
 
 char *readSequence()
 {
@@ -94,6 +93,15 @@ void postSemaphore(sem_t *sem)
     }
 }
 
+void closeSemaphore(sem_t *sem, char *name)
+{
+    if (sem_close(sem) == -1)
+    {
+        printf("[Error]: Manager could not close the %s semaphore\n", name);
+        exit(EXIT_FAILURE);
+    }
+}
+
 // Function to "randomly" generate a double in range 0-1
 double getRandom()
 {
@@ -141,14 +149,13 @@ void createGraph(int numBuses, int nodes, int matrix[numBuses][NUM_DIRECTIONS], 
         }
     }
 
-    // Create adjaceny matrix by iterating over matrix.txt values
+    // Create adjacency matrix by iterating over matrix.txt values
     for (int i = 0; i < numBuses; i++)
     {
         for (int j = 0; j < NUM_DIRECTIONS; j++)
         {
             if (matrix[i][j] == 2)
             {
-                // Add an edge in
                 adj_matrix[j][(i + 4)] = 1;
             }
             else if (matrix[i][j] == 1)
@@ -159,7 +166,7 @@ void createGraph(int numBuses, int nodes, int matrix[numBuses][NUM_DIRECTIONS], 
     }
 }
 
-int DFS(int checkNode, int nodes, int states[nodes], int adj_matrix[nodes][nodes], int cycle[nodes][2], int deadlocked)
+int DFS(int checkNode, int nodes, int states[nodes], int adj_matrix[nodes][nodes], int cycle[nodes][2])
 {
     // Set state of current node to visited
     states[checkNode] = VISITED;
@@ -168,30 +175,27 @@ int DFS(int checkNode, int nodes, int states[nodes], int adj_matrix[nodes][nodes
     {
         if (adj_matrix[checkNode][i] == 1)
         {
-            if (checkNode > i)
-            {
-                cycle[i][0] = checkNode;
-                cycle[i][1] = i;
-            }
             if (states[i] == INITIAL)
             {
-                deadlocked = DFS(i, nodes, states, adj_matrix, cycle, deadlocked);
+                // Add it to cycle
+                cycle[checkNode][0] = checkNode;
+                cycle[checkNode][1] = i;
+                return DFS(i, nodes, states, adj_matrix, cycle);
             }
             else if (states[i] == VISITED)
             {
-                deadlocked = 1;
-                return deadlocked;
+                cycle[checkNode][0] = checkNode;
+                cycle[checkNode][1] = i;
+                return 1;
             }
         }
     }
 
-    states[checkNode] = FINISHED;
-    return deadlocked;
+    return 0;
 }
 
 int checkDeadlock(int nodes, int adj_matrix[nodes][nodes], int cycle[nodes][2])
 {
-    int deadlocked = 0;
     // Set all values in cycle back to 0
     for (int i = 0; i < nodes; i++)
     {
@@ -216,27 +220,11 @@ int checkDeadlock(int nodes, int adj_matrix[nodes][nodes], int cycle[nodes][2])
         // Call DFS on node if state is still initial
         if (states[n] == INITIAL)
         {
-            deadlocked = DFS(n, nodes, states, adj_matrix, cycle, deadlocked);
-            if (deadlocked)
-            {
-                printf("in return: %d\n", deadlocked);
-                return deadlocked;
-            }
+            return DFS(n, nodes, states, adj_matrix, cycle);
         }
     }
-    // If DFS function does not return, then there is no cycle. Let user know
-    printf("outside return: %d\n", deadlocked);
 
-    return deadlocked;
-}
-
-void closeSemaphore(sem_t *sem, char *name)
-{
-    if (sem_close(sem) == -1)
-    {
-        printf("[Error]: Manager could not close the %s semaphore\n", name);
-        exit(EXIT_FAILURE);
-    }
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -244,7 +232,6 @@ int main(int argc, char *argv[])
 
     // Declare variables
     char *sequence;
-    int matrix_write_status;
     double p, r;
     int direction, deadlock = 0;
 
@@ -301,11 +288,6 @@ int main(int argc, char *argv[])
 
     // Write all 0's to matrix
     writeMatrix(numBuses, matrix);
-
-    // createGraph(numBuses, nodes, matrix, adj_matrix);
-
-    // int test = checkDeadlock(nodes, adj_matrix, cycle);
-    // printf("test val: %d\n", test);
 
     // Start sending buses
     pid_t pids[numBuses], waitingPid;
@@ -372,21 +354,23 @@ int main(int argc, char *argv[])
                 else if (pid == 0)
                 {
                     // Convert direction to an integer so bus program can reference direction/semaphores from array
-                    if (sequence[busID - 1] == 'N')
+                    switch (sequence[busID - 1])
                     {
+                    case 'N':
                         direction = 0;
-                    }
-                    else if (sequence[busID - 1] == 'W')
-                    {
+                        break;
+                    case 'W':
                         direction = 1;
-                    }
-                    else if (sequence[busID - 1] == 'S')
-                    {
+                        break;
+                    case 'S':
                         direction = 2;
-                    }
-                    else if (sequence[busID - 1] == 'E')
-                    {
+                        break;
+                    case 'E':
                         direction = 3;
+                        break;
+                    default:
+                        printf("[Error]: Unexpected input character: %c. Exiting\n", sequence[busID - 1]);
+                        exit(EXIT_FAILURE);
                     }
 
                     // Convert pid, direction to a char to send as command line argument
