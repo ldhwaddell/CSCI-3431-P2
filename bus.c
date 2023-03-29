@@ -1,4 +1,4 @@
-/*ADD FILE DESCRIPTION HERE*/
+/*File to represent a bus attempting to cross the junction*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -11,6 +11,12 @@
 sem_t *sem_directions[4];
 sem_t *semEditMatrix, *semJunction;
 
+/*
+ * Function: sigtermHandler
+ * --------------------
+ * Function to ensure that semaphores can gracefully
+ * exit in the event of but process receiving SIGTERM
+ */
 void sigtermHandler()
 {
     for (int i = 0; i < 4; i++)
@@ -25,12 +31,12 @@ void sigtermHandler()
 /*
  * Function: readMatrix
  * --------------------
- * Read a numBuses X num_directions matrix into arr
+ * Read a numBuses X num_directions matrix into variable matrix
  *
  *  numBuses: The number of buses(rows) in the matrix
- *  arr: The array to save the values in to
+ *  matrix: The matrix to save the values in to
  */
-void readMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
+void readMatrix(int numBuses, int matrix[][NUM_DIRECTIONS])
 {
     FILE *file = fopen("matrix.txt", "r");
     int status;
@@ -39,19 +45,30 @@ void readMatrix(int numBuses, int arr[][NUM_DIRECTIONS])
         exit(EXIT_FAILURE);
     }
 
-    // Read in values from matrix.txt into arr
+    // Read in values from matrix.txt into matrix
     for (int i = 0; i < numBuses; i++)
     {
-        fscanf(file, "%d %d %d %d", &arr[i][0], &arr[i][1], &arr[i][2], &arr[i][3]);
+        fscanf(file, "%d %d %d %d", &matrix[i][0], &matrix[i][1], &matrix[i][2], &matrix[i][3]);
     }
 
     fclose(file);
 }
 
-void updateMatrix(int row, int col, int newVal, int numBuses, int arr[][NUM_DIRECTIONS])
+/*
+ * Function: updateMatrix
+ * --------------------
+ * Update a value at matrix[rol][col] to newVal.
+ *
+ *  row: The row to update
+ *  col: The column to update
+ *  newVal: The new value to input
+ *  numBuses: The number of buses(rows) in the matrix
+ *  matrix: The matrix to save the values in to
+ */
+void updateMatrix(int row, int col, int newVal, int numBuses, int matrix[][NUM_DIRECTIONS])
 {
-    // Read current matrix values into arr
-    readMatrix(numBuses, arr);
+    // Read current matrix values into matrix
+    readMatrix(numBuses, matrix);
 
     // Open the file in write mode so file does not get appended to
     FILE *file = fopen("matrix.txt", "w");
@@ -74,7 +91,7 @@ void updateMatrix(int row, int col, int newVal, int numBuses, int arr[][NUM_DIRE
     }
 
     // Update desired value
-    arr[row][col] = newVal;
+    matrix[row][col] = newVal;
 
     // Write new matrix back to matrix.txt
     for (int i = 0; i < numBuses; i++)
@@ -82,11 +99,10 @@ void updateMatrix(int row, int col, int newVal, int numBuses, int arr[][NUM_DIRE
         for (int j = 0; j < NUM_DIRECTIONS; j++)
         {
             // Write it to file, checking for success
-            status = fprintf(file, "%d ", arr[i][j]);
+            status = fprintf(file, "%d ", matrix[i][j]);
             if (status < 0)
             {
                 printf("[Error]: Could not write to matrix.txt\n");
-                printf("[]");
                 exit(EXIT_FAILURE);
             }
         }
@@ -102,6 +118,16 @@ void updateMatrix(int row, int col, int newVal, int numBuses, int arr[][NUM_DIRE
     fclose(file);
 }
 
+/*
+ * Function: waitSemaphore
+ * --------------------
+ * Wrapper for sem_wait that handles error checking
+ * with useful error messages
+ *
+ *  sem: The semaphore to call sem_wait on
+ *  pid: The bus process that is requesting to do this
+ *  direction: The direction or name of the semaphore
+ */
 void waitSemaphore(sem_t *sem, int pid, char *direction)
 {
     if (sem_wait(sem) == -1)
@@ -126,6 +152,16 @@ void waitSemaphore(sem_t *sem, int pid, char *direction)
     }
 }
 
+/*
+ * Function: postSemaphore
+ * --------------------
+ * Wrapper for sem_post that handles error checking
+ * with useful error messages
+ *
+ *  sem: The semaphore to call sem_post on
+ *  pid: The bus process that is requesting to do this
+ *  direction: The direction or name of the semaphore
+ */
 void postSemaphore(sem_t *sem, int pid, char *direction)
 {
     if (sem_post(sem) == -1)
@@ -150,6 +186,16 @@ void postSemaphore(sem_t *sem, int pid, char *direction)
     }
 }
 
+/*
+ * Function: closeSemaphore
+ * --------------------
+ * Wrapper for sem_close that handles error checking
+ * with useful error messages
+ *
+ *  sem: The semaphore to call sem_close on
+ *  pid: The bus process that is requesting to do this
+ *  direction: The direction or name of the semaphore
+ */
 void closeSemaphore(sem_t *sem, int pid, char *direction)
 {
     if (sem_close(sem) == -1)
@@ -182,7 +228,7 @@ int main(int argc, char *argv[])
 
     // Declare variables
     pid_t pid;
-    int curr_direction, numBuses;
+    int curr_direction, numBuses, right;
     char *directions[] = {"North", "West", "South", "East"};
 
     // Get bus id
@@ -195,7 +241,7 @@ int main(int argc, char *argv[])
     curr_direction = atoi(argv[9]);
 
     // Find right semaphore direction
-    int right = (curr_direction + 1) % NUM_DIRECTIONS;
+    right = (curr_direction + 1) % NUM_DIRECTIONS;
 
     // Create matrix to hold current semaphore values
     int matrix[numBuses][NUM_DIRECTIONS];
@@ -204,6 +250,7 @@ int main(int argc, char *argv[])
     semEditMatrix = sem_open(argv[1], 0);
     semJunction = sem_open(argv[2], 0);
 
+    // Handle error checking
     if (semEditMatrix == SEM_FAILED)
     {
         printf("[Error]: Bus <%d> could not create 'semEditMatrix'\n", pid);
@@ -216,10 +263,11 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Assign each of the directional semaphores to a spot in the sem_directions array
+    // Assign each of the directional semaphores to a spot in the sem_directions matrixay
     for (int i = 3; i < 7; i++)
     {
         sem_directions[i - 3] = sem_open(argv[i], 0);
+        // Handle error eching if semaphore fails
         if (sem_directions[i - 3] == SEM_FAILED)
         {
             printf("[Error]: Bus <%d> could not create semaphore '%s'\n", pid, argv[i]);
