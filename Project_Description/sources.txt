@@ -4,7 +4,5 @@ https://stackoverflow.com/questions/57341825/what-does-in-front-of-function-name
 [2] DFS to see if a directed graph is cyclic
  https://www.codezclub.com/c-find-whether-directed-graph-is-cyclic-not/
 
- [3] PRinting cycle idea
- https://codeforces.com/blog/entry/66161
 
  

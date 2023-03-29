@@ -111,12 +111,12 @@ double getRandom()
 /*
  * Function: readMatrix
  * --------------------
- * Read a numBuses X num_directions matrix into arr
+ * Read a numBuses X num_directions matrix into matrix
  *
  *  numBuses: The number of buses(rows) in the matrix
- *  arr: The array to save the values in to
+ *  matrix: The array to save the values in to
  */
-void readMatrix(int numBuses, int arr[numBuses][NUM_DIRECTIONS])
+void readMatrix(int numBuses, int matrix[numBuses][NUM_DIRECTIONS])
 {
     FILE *file = fopen("matrix.txt", "r");
     int status;
@@ -128,7 +128,7 @@ void readMatrix(int numBuses, int arr[numBuses][NUM_DIRECTIONS])
     // Read in values from matrix.txt into arr
     for (int i = 0; i < numBuses; i++)
     {
-        fscanf(file, "%d %d %d %d", &arr[i][0], &arr[i][1], &arr[i][2], &arr[i][3]);
+        fscanf(file, "%d %d %d %d", &matrix[i][0], &matrix[i][1], &matrix[i][2], &matrix[i][3]);
     }
 
     fclose(file);
@@ -225,6 +225,67 @@ int checkDeadlock(int nodes, int adj_matrix[nodes][nodes], int cycle[nodes][2])
     }
 
     return 0;
+}
+
+int findHolding(int numBuses, int deadlockGrid[numBuses][NUM_DIRECTIONS + 1], int bus)
+{
+    int waitingFor = 0;
+    int holdingBus = 0;
+
+    // Find which semaphore bus is waiting for
+    for (int i = 1; i < NUM_DIRECTIONS + 1; i++)
+    {
+        if (deadlockGrid[bus][i] == 1)
+        {
+            waitingFor = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i < NUM_DIRECTIONS; i++)
+    {
+        if (deadlockGrid[i][waitingFor] == 2)
+        {
+            holdingBus = i;
+            break;
+        }
+    }
+
+    return holdingBus;
+}
+
+void createCycle(int numBuses, int matrix[][NUM_DIRECTIONS], char *sequence)
+{
+
+    // Read current values from matrix.txt into curr_matrix
+    readMatrix(numBuses, matrix);
+
+    int deadlockGrid[NUM_DIRECTIONS][NUM_DIRECTIONS + 1];
+    for (int i = 0, row = 0; i < numBuses; i++)
+    {
+        for (int j = 0; j < NUM_DIRECTIONS; j++)
+        {
+            if (matrix[i][j] == 2)
+            {
+                deadlockGrid[row][0] = i; // store the row index in the first column
+                for (int k = 0; k < NUM_DIRECTIONS; k++)
+                {
+                    deadlockGrid[row][k + 1] = matrix[i][k]; // store the values from matrix in remaining columns
+                }
+                row++;
+                break; // exit inner loop once a deadlock row is found
+            }
+        }
+    }
+
+    printf("---------------------------------------------\n");
+
+    for (int i = 0; i < 4; i++)
+    {
+        int holdingBus = findHolding(numBuses, deadlockGrid, i);
+        printf("Bus <%d> from %c is waiting for Bus<%d> from %c\n", deadlockGrid[i][0] + 1, sequence[deadlockGrid[i][0]], deadlockGrid[holdingBus][0] + 1, sequence[holdingBus]);
+    }
+    printf("----------------------------------------------\n");
 }
 
 int main(int argc, char *argv[])
@@ -426,6 +487,7 @@ int main(int argc, char *argv[])
             }
         }
         printf("\nSystem Deadlocked!\nThe cycle below was detected:\n\n");
+        createCycle(numBuses, matrix, sequence);
     }
     // Otherwise let user know of success
     else if (remainingBuses == 0)
