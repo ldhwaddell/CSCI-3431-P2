@@ -1,8 +1,8 @@
 [1] Reading input from file:
-https://stackoverflow.com/questions/57341825/what-does-in-front-of-function-name-mean-in-c
+https://www.tutorialkart.com/c-programming/c-read-text-file/
 
 [2] DFS to see if a directed graph is cyclic
- https://www.codezclub.com/c-find-whether-directed-graph-is-cyclic-not/
+https://www.codezclub.com/c-find-whether-directed-graph-is-cyclic-not/
 
 
  

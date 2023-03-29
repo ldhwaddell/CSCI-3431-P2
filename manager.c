@@ -139,6 +139,7 @@ void postSemaphore(sem_t *sem)
  * with useful error messages
  *
  *  sem: The semaphore to call sem_close on
+ *  name: The name of the semaphore in text format
  */
 void closeSemaphore(sem_t *sem, char *name)
 {
@@ -288,7 +289,7 @@ int DFS(int checkNode, int nodes, int states[nodes], int adj_matrix[nodes][nodes
 int checkDeadlock(int nodes, int adj_matrix[nodes][nodes])
 {
 
-    // Create an matrixay to keep track of the states of all the nodes
+    // Create an matrix to keep track of the states of all the nodes
     int states[nodes];
 
     // Set the states of all nodes to initial
@@ -423,7 +424,7 @@ int main(int argc, char *argv[])
     }
 
     p = atof(argv[1]);
-    if (p < 0.1 || p > 0.7)
+    if (p < 0.2 || p > 0.7)
     {
         printf("[Error]: p must be in range [0.2, 0.7]\n");
         exit(EXIT_FAILURE);
@@ -512,7 +513,7 @@ int main(int argc, char *argv[])
 
             if (r < p)
             {
-                // If r<p, get the seamphore for editing the matrix
+                // If r<p, get the semaphore for editing the matrix
                 // Then read in values from matrix.txt and check a deadlock
                 waitSemaphore(semEditMatrix);
                 createGraph(numBuses, nodes, matrix, adj_matrix);
