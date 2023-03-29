@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <semaphore.h>
 #include <string.h>
+#include <signal.h>
 
 #define NUM_DIRECTIONS 4
 

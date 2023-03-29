@@ -7,7 +7,11 @@
 #include <semaphore.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 
+#define O_EXCL 0x00000800
+#define O_CREAT 0x00000200
 #define NUM_DIRECTIONS 4
 #define INITIAL 1
 #define VISITED 2
