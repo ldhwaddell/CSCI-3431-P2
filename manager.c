@@ -161,7 +161,7 @@ void closeSemaphore(sem_t *sem, char *name)
  */
 double getRandom()
 {
-    return (rand() % RAND_MAX) / (double)RAND_MAX;
+    return (rand() % 10) / 10.0;
 }
 
 /*
